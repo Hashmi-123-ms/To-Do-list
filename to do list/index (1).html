@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Daybook Tasks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: single centered work column — add bar on top, filter tabs with counts, task list sorted by deadline */
+:root{
+  --bg:#eef2f1; --surface:#ffffff; --fg:#17211f; --muted:#5d6b68; --line:#d5dedb;
+  --accent:#1f6f5c; --accent-soft:#dcebe6; --on-accent:#ffffff;
+  --late:#b3362b; --late-soft:#f8e1de; --soon:#9a6200; --soon-soft:#f6ead2;
+  --font-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111816; --surface:#19221f; --fg:#e4ecea; --muted:#93a39f; --line:#2b3733;
+  --accent:#5cc3a6; --accent-soft:#1d3a32; --on-accent:#0c1714;
+  --late:#f08a7f; --late-soft:#3d1f1c; --soon:#e5b55c; --soon-soft:#3a2e17; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111816; --surface:#19221f; --fg:#e4ecea; --muted:#93a39f; --line:#2b3733;
+  --accent:#5cc3a6; --accent-soft:#1d3a32; --on-accent:#0c1714;
+  --late:#f08a7f; --late-soft:#3d1f1c; --soon:#e5b55c; --soon-soft:#3a2e17; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding-block:32px 64px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:24px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--font-display);font-weight:800;font-size:2.2rem;letter-spacing:-.02em;margin:0;line-height:1;text-wrap:balance}
+.today{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.progress{font-size:.9rem;color:var(--muted)}
+.progress b{color:var(--fg);font-variant-numeric:tabular-nums}
+
+form.add{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;grid-template-columns:1fr auto auto;gap:10px}
+input,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 11px;min-width:0}
+input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+input[type=date]{font-family:var(--font-mono);font-size:.85rem}
+.btn{font:inherit;font-weight:600;border-radius:6px;padding:9px 16px;border:1px solid transparent;cursor:pointer}
+.btn:focus-visible,.icon:focus-visible,.tab:focus-visible,.check:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary{background:var(--accent);color:var(--on-accent)}
+.ghost{background:transparent;border-color:var(--line);color:var(--fg)}
+.danger{background:var(--late);color:var(--surface)}
+.err{grid-column:1/-1;color:var(--late);font-size:.85rem;margin:0}
+@media (max-width:520px){form.add{grid-template-columns:1fr 1fr}form.add input[name=title]{grid-column:1/-1}}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{font:inherit;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;cursor:pointer;white-space:nowrap}
+.tab[aria-selected=true]{color:var(--fg);border-color:var(--accent)}
+.count{font-family:var(--font-mono);font-size:.75rem;margin-left:6px;padding:1px 6px;border-radius:99px;background:var(--accent-soft);color:var(--fg)}
+
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+li.task{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:14px 4px;border-bottom:1px solid var(--line)}
+.check{width:22px;height:22px;margin-top:2px;border-radius:50%;border:2px solid var(--muted);background:none;cursor:pointer;display:grid;place-items:center;padding:0;color:var(--on-accent)}
+.done .check{background:var(--accent);border-color:var(--accent)}
+.check svg{width:12px;height:12px;opacity:0}.done .check svg{opacity:1}
+.body{min-width:0}
+.t{font-weight:600;overflow-wrap:anywhere}
+.done .t{text-decoration:line-through;color:var(--muted)}
+.notes{color:var(--muted);font-size:.9rem;margin-top:2px;overflow-wrap:anywhere}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.chip{font-family:var(--font-mono);font-size:.72rem;padding:2px 8px;border-radius:4px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.chip.late{background:var(--late-soft);color:var(--late);border-color:transparent}
+.chip.soon{background:var(--soon-soft);color:var(--soon);border-color:transparent}
+.chip.ok{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.actions{display:flex;gap:2px}
+.icon{background:none;border:0;color:var(--muted);cursor:pointer;padding:6px;border-radius:6px;display:grid;place-items:center}
+.icon:hover{background:var(--bg);color:var(--fg)}.icon.del:hover{color:var(--late)}
+.icon svg{width:17px;height:17px}
+
+.editbox{grid-column:2/-1;display:flex;flex-direction:column;gap:8px}
+.editrow{display:flex;gap:8px;flex-wrap:wrap}.editrow input{flex:1 1 160px}
+.confirm{grid-column:2/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--late-soft);padding:8px 10px;border-radius:6px;font-size:.9rem}
+.confirm span{flex:1 1 auto}
+.empty{text-align:center;color:var(--muted);padding:40px 16px}
+.empty strong{display:block;font-family:var(--font-display);color:var(--fg);font-size:1.1rem}
+.foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.linkbtn{font:inherit;background:none;border:0;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+@media (prefers-reduced-motion:no-preference){li.task{transition:background .2s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="today" id="today"></div>
+      <h1>Daybook Tasks</h1>
+    </div>
+    <div class="progress" id="progress"></div>
+  </header>
+
+  <form class="add" id="addForm" novalidate>
+    <input id="newTitle" name="title" placeholder="What needs doing?" aria-label="Task title" maxlength="140">
+    <input id="newDate" name="date" type="date" aria-label="Deadline">
+    <button class="btn primary" type="submit">Add task</button>
+    <p class="err" id="addErr" hidden>Type a task title, then press Add task.</p>
+  </form>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-f="all">All<span class="count" id="cAll"></span></button>
+    <button class="tab" role="tab" data-f="pending">Pending<span class="count" id="cPending"></span></button>
+    <button class="tab" role="tab" data-f="done">Completed<span class="count" id="cDone"></span></button>
+  </div>
+
+  <ul class="list" id="list"></ul>
+
+  <div class="foot">
+    <span id="note"></span>
+    <button class="linkbtn" id="clearDone" type="button">Clear completed</button>
+  </div>
+</div>
+
+<script>
+(function(){
+const KEY="daybook-tasks-v1";
+const $=s=>document.querySelector(s);
+const pad=n=>String(n).padStart(2,"0");
+const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const today=new Date();today.setHours(0,0,0,0);
+const addDays=n=>{const d=new Date(today);d.setDate(d.getDate()+n);return iso(d)};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+let tasks=null, filter="all", editing=null, confirming=null, isSample=false;
+try{const raw=localStorage.getItem(KEY);if(raw)tasks=JSON.parse(raw)}catch(e){}
+if(!Array.isArray(tasks)){
+  isSample=true;
+  tasks=[
+    {id:uid(),title:"Example: Submit project report",notes:"Attach the final PDF",date:addDays(-1),done:false},
+    {id:uid(),title:"Example: Pay electricity bill",notes:"",date:addDays(0),done:false},
+    {id:uid(),title:"Example: Book train tickets",notes:"Weekend trip",date:addDays(3),done:false},
+    {id:uid(),title:"Example: Call the bank",notes:"",date:addDays(-2),done:true}
+  ];
+}
+function save(){isSample=false;try{localStorage.setItem(KEY,JSON.stringify(tasks))}catch(e){}}
+
+function dueInfo(t){
+  if(!t.date)return {cls:"",label:"No deadline"};
+  const d=new Date(t.date+"T00:00:00");const diff=Math.round((d-today)/864e5);
+  const nice=d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:d.getFullYear()!==today.getFullYear()?"numeric":undefined});
+  if(t.done)return {cls:"",label:"Due "+nice};
+  if(diff<0)return {cls:"late",label:"Overdue · "+nice};
+  if(diff===0)return {cls:"soon",label:"Due today"};
+  if(diff===1)return {cls:"soon",label:"Due tomorrow"};
+  return {cls:"ok",label:"Due "+nice+" · in "+diff+" days"};
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ico={
+  tick:'<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6.5 5 9l5-6"/></svg>',
+  edit:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13.5 3.5l3 3L7 16H4v-3z"/></svg>',
+  del:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>'
+};
+
+function render(){
+  $("#today").textContent=today.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const pending=tasks.filter(t=>!t.done), done=tasks.filter(t=>t.done);
+  $("#cAll").textContent=tasks.length;$("#cPending").textContent=pending.length;$("#cDone").textContent=done.length;
+  const late=pending.filter(t=>t.date&&new Date(t.date+"T00:00:00")<today).length;
+  $("#progress").innerHTML="<b>"+done.length+"</b> of <b>"+tasks.length+"</b> done"+(late?" · <b>"+late+"</b> overdue":"");
+  document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",b.dataset.f===filter));
+  $("#note").textContent=isSample?"These are example tasks. Add your own or delete them.":"Saved in this browser.";
+  $("#clearDone").hidden=!done.length;
+
+  let view=filter==="pending"?pending:filter==="done"?done:tasks.slice();
+  view.sort((a,b)=>(a.done-b.done)||((a.date||"9999")<(b.date||"9999")?-1:(a.date||"9999")>(b.date||"9999")?1:0));
+  const list=$("#list");
+  if(!view.length){
+    const msg=filter==="pending"?["Nothing pending","Every task is done. Add a new one above."]:filter==="done"?["No completed tasks yet","Tick the circle next to a task to mark it done."]:["No tasks yet","Type a task and pick a deadline above to get started."];
+    list.innerHTML='<li class="empty"><strong>'+msg[0]+'</strong>'+msg[1]+'</li>';return;
+  }
+  list.innerHTML=view.map(t=>{
+    const di=dueInfo(t);
+    let extra="";
+    if(editing===t.id){
+      extra='<div class="editbox"><div class="editrow"><input id="eTitle" value="'+esc(t.title)+'" aria-label="Edit title" maxlength="140"><input id="eDate" type="date" value="'+(t.date||"")+'" aria-label="Edit deadline"></div>'+
+        '<textarea id="eNotes" rows="2" placeholder="Notes (optional)" aria-label="Edit notes">'+esc(t.notes||"")+'</textarea>'+
+        '<div class="editrow"><button class="btn primary" data-a="saveEdit" data-id="'+t.id+'">Save changes</button><button class="btn ghost" data-a="cancel">Cancel</button></div></div>';
+    }else if(confirming===t.id){
+      extra='<div class="confirm"><span>Delete this task? This cannot be undone.</span><button class="btn danger" data-a="reallyDel" data-id="'+t.id+'">Delete</button><button class="btn ghost" data-a="cancel">Keep</button></div>';
+    }
+    return '<li class="task'+(t.done?" done":"")+'">'+
+      '<button class="check" data-a="toggle" data-id="'+t.id+'" aria-label="'+(t.done?"Mark as pending":"Mark as completed")+'">'+ico.tick+'</button>'+
+      '<div class="body"><div class="t">'+esc(t.title)+'</div>'+(t.notes?'<div class="notes">'+esc(t.notes)+'</div>':"")+
+      '<div class="meta"><span class="chip '+di.cls+'">'+di.label+'</span>'+(t.done?'<span class="chip ok">Completed</span>':'<span class="chip">Pending</span>')+'</div></div>'+
+      '<div class="actions"><button class="icon" data-a="edit" data-id="'+t.id+'" aria-label="Edit task">'+ico.edit+'</button><button class="icon del" data-a="del" data-id="'+t.id+'" aria-label="Delete task">'+ico.del+'</button></div>'+
+      extra+'</li>';
+  }).join("");
+  if(editing){const el=$("#eTitle");if(el)el.focus()}
+}
+
+$("#addForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const title=$("#newTitle").value.trim();
+  if(!title){$("#addErr").hidden=false;$("#newTitle").focus();return}
+  $("#addErr").hidden=true;
+  tasks.push({id:uid(),title,notes:"",date:$("#newDate").value||"",done:false});
+  $("#newTitle").value="";$("#newDate").value="";
+  if(filter==="done")filter="all";
+  save();render();
+});
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{filter=b.dataset.f;editing=confirming=null;render()}));
+$("#clearDone").addEventListener("click",()=>{tasks=tasks.filter(t=>!t.done);save();render()});
+$("#list").addEventListener("click",e=>{
+  const b=e.target.closest("[data-a]");if(!b)return;
+  const a=b.dataset.a,t=tasks.find(x=>x.id===b.dataset.id);
+  if(a==="toggle"){t.done=!t.done;save()}
+  else if(a==="edit"){editing=t.id;confirming=null}
+  else if(a==="del"){confirming=t.id;editing=null}
+  else if(a==="reallyDel"){tasks=tasks.filter(x=>x.id!==t.id);confirming=null;save()}
+  else if(a==="cancel"){editing=confirming=null}
+  else if(a==="saveEdit"){
+    const title=$("#eTitle").value.trim();if(!title){$("#eTitle").focus();return}
+    t.title=title;t.date=$("#eDate").value||"";t.notes=$("#eNotes").value.trim();editing=null;save();
+  }
+  render();
+});
+$("#list").addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&(editing||confirming)){editing=confirming=null;render()}
+  if(e.key==="Enter"&&editing&&e.target.tagName==="INPUT"){e.preventDefault();$('[data-a="saveEdit"]').click()}
+});
+render();
+})();
+</script>
+</body>
+</html>
